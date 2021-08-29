@@ -1,0 +1,47 @@
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <div style="display: flex; flex-direction: column; align-items: center">
+      <textarea id="jsoninput" name="jsoninput" cols="80" rows="20">
+{}</textarea
+      >
+      <span id="startB">Ожидаем...</span>
+      <div
+        id="zoneImage"
+        style="display: flex; flex-direction: column; align-items: center"
+      ></div>
+      <div id="zoneButton"></div>
+    </div>
+    <!-- <textarea id="jsonoutput" name="jsonoutput" cols="80" rows="20"></textarea> -->
+    <div id="test"></div>
+    <script src="wasm_exec.js"></script>
+    <script>
+      const go = new Go();
+      WebAssembly.instantiateStreaming(
+        fetch("main.wasm"),
+        go.importObject
+      ).then((result) => {
+        go.run(result.instance);
+      });
+    </script>
+    <script>
+      function getImagesClick(str) {
+        mm = new Promise((a, b) => {
+          console.log("Старт...");
+          getImagesClick2(str);
+          a(true);
+        });
+        mm.then((r) => {
+          console.log("Готово...");
+        });
+      }
+    </script>
+    <script>
+      fetch("main.wasm")
+        .then((response) => response.arrayBuffer())
+        .then((bytes) => WebAssembly.compile(bytes))
+        .then((WasmModule) => g_WebWorker.postMessage(WasmModule));
+    </script>
+  </head>
+  <body></body>
+</html>

@@ -1,0 +1,206 @@
+wasm && js
+
+package p
+// package main2
+
+import (
+	"encoding/json"
+	"fmt"
+	"imgwasm/imgtxt"
+	"strconv"
+	"syscall/js"
+)
+
+func main() {
+	fmt.Println("Hello, WebAssembly!")
+	js.Global().Set("formatJSON", jsonWrapper())
+	js.Global().Set("getImagesClick2", getImages())
+	js.Global().Set("getImageNum", getImageNum())
+	startButton()
+	<-make(chan bool)
+
+}
+func startButton() {
+	jsDoc := js.Global().Get("document")
+	if !jsDoc.Truthy() {
+		fmt.Println("Не получить document")
+	}
+	startB := jsDoc.Call("getElementById", "startB")
+	if !startB.Truthy() {
+		fmt.Println("не получить startB")
+	}
+	startB.Set("innerHTML", "")
+	startB.Set("innerHTML", "<input id='button' type='submit' onclick='getImagesClick(jsoninput.value)' value='Старт!' />")
+}
+func prettyJson(input string) (string, error) {
+	var raw interface{}
+	if err := json.Unmarshal([]byte(input), &raw); err != nil {
+		return "", err
+	}
+	pretty, err := json.MarshalIndent(raw, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	newElement()
+	return string(pretty), nil
+}
+
+func jsonWrapper() js.Func {
+	jsonFunc := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		if len(args) != 1 {
+			return "Invalid no of arguments passed"
+		}
+		inputJSON := args[0].String()
+		fmt.Printf("input %s\n", inputJSON)
+		pretty, err := prettyJson(inputJSON)
+		if err != nil {
+			fmt.Printf("unable to convert to json %s\n", err)
+			return err.Error()
+		}
+		return pretty
+	})
+	return jsonFunc
+}
+func newElement() string {
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Println("11", err)
+		}
+	}()
+	jsDoc := js.Global().Get("document")
+	if !jsDoc.Truthy() {
+		fmt.Println("Не получить document")
+	}
+	jsonOuputTextArea := jsDoc.Call("getElementById", "jsonoutput")
+	if !jsonOuputTextArea.Truthy() {
+		fmt.Println("не получить jsonoutput")
+	}
+	jsonDiv := jsDoc.Call("getElementById", "test")
+	if !jsonDiv.Truthy() { // это способ тестирования JavaScript для nil
+		fmt.Println("не получить test")
+	}
+	fmt.Println("получили test", jsonDiv)
+	div1 := jsDoc.Call("createElement", "div")
+
+	jsonDiv.Call("appendChild", div1)
+	div1.Set("innerHTML", "ПРИВЕТ!")
+	fmt.Println("Дошли ло конца")
+	return ""
+}
+
+func getImages() js.Func {
+
+	jsonFunc := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		if len(args) != 1 {
+			return "Invalid no of arguments passed"
+		}
+		go func() {
+			value := args[0].String()
+
+			imgtxt.CreateImages(value)
+
+			getImageNum1(0)
+			go createButtons()
+		}()
+		return ""
+	})
+	return jsonFunc
+}
+
+func getImageNum() js.Func {
+	jsonFunc := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		if len(args) != 1 {
+			return "Invalid no of arguments passed"
+		}
+		//numStr := args[0].String()
+		numInt := args[0].Int()
+
+		getImageNum1(numInt)
+		return ""
+	})
+	return jsonFunc
+}
+
+func getImageNum1(num int) {
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Println("Error: ", err)
+		}
+	}()
+	if len(imgtxt.Images64) > 0 {
+		imgtxt.ImageToDom(imgtxt.Images64[num])
+	}
+}
+
+func createButtons() {
+	if len(imgtxt.Images64) > 0 {
+		jsDoc := js.Global().Get("document")
+		if !jsDoc.Truthy() {
+			fmt.Println("Не получить document")
+		}
+		zoneButton := jsDoc.Call("getElementById", "zoneButton")
+		if !zoneButton.Truthy() {
+			fmt.Println("не получить zoneButton")
+		}
+		zoneButton.Set("innerHTML", "")
+		//var cbb []js.Func
+		for i := 0; i < len(imgtxt.Images64); i++ {
+			button := jsDoc.Call("createElement", "button")
+			button.Call("setAttribute", "onmouseover", "getImageNum("+strconv.Itoa(i)+")")
+			button.Call("setAttribute", "onclick", "getImageNum("+strconv.Itoa(i)+")")
+			button.Call("setAttribute", "data-test", strconv.Itoa(i))
+			button.Set("textContent", strconv.Itoa(i))
+
+			zoneButton.Call("appendChild", button)
+			// fmt.Println("раз:", i)
+			// cbb = append(cbb, js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+			// 	fmt.Println("button clicked:", i)
+			// 	// cb.Release() // release the function if the button will not be clicked again
+			// 	getImageNum1(i)
+			// 	return nil
+			// }))
+			//cbb = append(cbb, cb)
+			//	button.Call("addEventListener", "click", cbb[len(cbb)-1]) // getImageNum())
+			//?-------------- Работает и this соответствует ------------------------------------------------------------------------
+			// //*если подписываться на события, то свои параметры замыкаем
+			// //*без параметров замыкание не нужно
+			// kk := func(v int) js.Func {
+			// 	return js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+			// 		d := this.Call("getAttribute", "data-test").String()
+			// 		fmt.Println("data-test", d)
+			// 		// Плевать на параметры, замыкаем свои
+			// 		getImageNum1(v)
+			// 		return nil
+			// 	})
+			// }
+			// button.Call("addEventListener", "click", kk(i))
+			//? ---------------^^^^^^^--------------------------
+
+		}
+		button := jsDoc.Call("createElement", "button")
+		button.Call("setAttribute", "onmouseover", "getImageNum(0)")
+		//button.Call("setAttribute", "onclick", "getImageNum(0)")
+		button.Call("setAttribute", "data-test", "Пример2")
+		button.Set("textContent", "Супер кнопка")
+
+		//zoneButton.Call("appendChild", span)
+		zoneButton.Call("appendChild", button)
+		// cb := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		// 	// cb.Release() // Отпустите функцию, если кнопка больше не будет нажата
+		// 	fmt.Println("Событие")
+		// 	if len(args) < 1 {
+		// 		fmt.Println("Invalid no of arguments passed")
+		// 	}
+		// 	fmt.Println("что там: ", this.Get("a"), this.Get("bb")) // Потеряли !!, this.Call("getAttribute", "data-test"))
+		// 	return nil
+		// })
+		// //?  при таком подходе Теряется this
+		// m := make(map[string]interface{})
+		// m["handleEvent"] = cb
+		// m["a"] = "789789"
+		// m["bb"] = "Привет"
+		// button.Call("addEventListener", "click", js.ValueOf(m)) // можно и без js.ValueOf
+
+	}
+
+}
